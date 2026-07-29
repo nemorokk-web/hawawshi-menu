@@ -187,7 +187,6 @@ function CartDrawer({ cartItems, total, activeTab, onClose, onAdd, onRemove }) {
     }
 
     const branchName = activeTab === 'hawawshi' ? 'فرع إمبابة' : 'فرع زايد';
-    const targetWhatsapp = activeTab === 'hawawshi' ? '201007273768' : '201114444130';
 
     const msg = [
       `🛒 *طلب جديد*`,
@@ -201,7 +200,7 @@ function CartDrawer({ cartItems, total, activeTab, onClose, onAdd, onRemove }) {
       `💰 *الإجمالي: ${total} جنيه*`,
     ].join('\n');
 
-    const url = `https://wa.me/${targetWhatsapp}?text=${encodeURIComponent(msg)}`;
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
     setSent(true);
   }
