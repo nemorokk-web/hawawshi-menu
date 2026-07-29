@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './index.css';
 import { hawawshiMenu, butcheryMenu } from './data.js';
-
-const WHATSAPP_NUMBER = '201007273768'; // Live Imbaba WhatsApp number
-
+const WHATSAPP_NUMBER = '201007273768'; // Live number
 const CAROUSEL_IMAGES = [
   'https://i.ibb.co/m1ZcW8q/images.jpg',
   'https://i.ibb.co/0jtTmDZq/images-17.jpg',
@@ -74,15 +72,19 @@ function Carousel() {
 
 // ── Item Card ─────────────────────────────────────────────────────────
 function ItemCard({ item, qty, onAdd, onRemove }) {
+  const isOutOfStock = item.inStock === false || item.inStock === "false" || item.inStock === "FALSE";
+
   return (
-    <div className={`item-card${qty > 0 ? ' in-cart' : ''}`} onClick={qty === 0 ? onAdd : undefined}>
+    <div className={`item-card${qty > 0 ? ' in-cart' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`} onClick={(qty === 0 && !isOutOfStock) ? onAdd : undefined}>
       <div className="item-info">
         <div className="item-name">{item.name}</div>
         {item.desc && <div className="item-desc">{item.desc}</div>}
       </div>
       <div className="item-right">
         <div className="item-price">{item.price} جنيه</div>
-        {qty === 0 ? (
+        {isOutOfStock ? (
+           <div style={{ color: 'var(--red)', fontSize: '11px', fontWeight: '700', padding: '4px 8px', background: 'rgba(239,68,68,0.1)', borderRadius: '12px' }}>غير متوفر</div>
+        ) : qty === 0 ? (
           <button className="add-btn" onClick={(e) => { e.stopPropagation(); onAdd(); }} aria-label="أضف">＋</button>
         ) : (
           <div className="qty-controls" onClick={e => e.stopPropagation()}>
@@ -118,23 +120,80 @@ function CategorySection({ category, items, cart, onAdd, onRemove }) {
 }
 
 // ── Cart Drawer ────────────────────────────────────────────────────────
-function CartDrawer({ cartItems, total, onClose, onAdd, onRemove }) {
+function CartDrawer({ cartItems, total, activeTab, onClose, onAdd, onRemove }) {
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [orderType, setOrderType] = useState('delivery'); // 'delivery' or 'pickup'
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phone2, setPhone2] = useState('');
   const [address, setAddress] = useState('');
+  const [region, setRegion] = useState('');
+  const [floor, setFloor] = useState('');
+  const [apartment, setApartment] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [notes, setNotes] = useState('');
+  const [registeredPhone, setRegisteredPhone] = useState('');
   const [sent, setSent] = useState(false);
 
   function handleOrder() {
-    if (!name.trim() || !address.trim()) return;
+    const outOfStockItems = cartItems.filter(({ item }) => item.inStock === false || item.inStock === "false" || item.inStock === "FALSE");
+    if (outOfStockItems.length > 0) {
+      alert("عذراً، بعض الأصناف في طلبك غير متوفرة حالياً. يرجى إزالتها والمحاولة مرة أخرى.");
+      return;
+    }
+
+    if (orderType === 'delivery') {
+      if (isRegistered) {
+        if (!registeredPhone.trim()) return;
+      } else {
+        if (!name.trim() || !phone.trim() || !region.trim() || !address.trim() || !floor.trim() || !apartment.trim() || !landmark.trim()) return;
+      }
+    } else {
+      if (!name.trim() || !phone.trim()) return;
+    }
 
     const lines = cartItems.map(
       ({ item, qty }) => `• ${item.name} × ${qty} = ${item.price * qty} جنيه`
     );
 
+    let customerInfo = [];
+    if (orderType === 'pickup') {
+      customerInfo = [
+        `📦 *نوع الطلب:* استلام من الفرع (تيك أواي)`,
+        `👤 *الاسم:* ${name.trim()}`,
+        `📞 *رقم الهاتف:* ${phone.trim()}`,
+        notes.trim() ? `📝 *ملاحظات:* ${notes.trim()}` : null
+      ].filter(Boolean);
+    } else {
+      if (isRegistered) {
+        customerInfo = [
+          `🛵 *نوع الطلب:* دليفري (مسجل مسبقاً)`,
+          `👤 *الهاتف المسجل:* ${registeredPhone.trim()}`,
+          notes.trim() ? `📝 *ملاحظات:* ${notes.trim()}` : null
+        ].filter(Boolean);
+      } else {
+        customerInfo = [
+          `🛵 *نوع الطلب:* دليفري`,
+          `👤 *الاسم:* ${name.trim()}`,
+          `📞 *رقم الهاتف:* ${phone.trim()}`,
+          phone2.trim() ? `📞 *رقم هاتف اخر:* ${phone2.trim()}` : null,
+          `🏘️ *المنطقة:* ${region.trim()}`,
+          `📍 *العنوان:* ${address.trim()}`,
+          `🏢 *الدور:* ${floor.trim()} | 🚪 *شقة:* ${apartment.trim()}`,
+          `🔖 *علامة مميزة:* ${landmark.trim()}`,
+          notes.trim() ? `📝 *ملاحظات:* ${notes.trim()}` : null
+        ].filter(Boolean);
+      }
+    }
+
+    const branchName = activeTab === 'hawawshi' ? 'فرع إمبابة' : 'فرع زايد';
+    const targetWhatsapp = activeTab === 'hawawshi' ? '201007273768' : '201114444130';
+
     const msg = [
-      `🛒 *طلب جديد من حواوشي الربيع*`,
+      `🛒 *طلب جديد*`,
+      `🏢 *الفرع:* ${branchName}`,
       ``,
-      `👤 *الاسم:* ${name.trim()}`,
-      `📍 *العنوان:* ${address.trim()}`,
+      ...customerInfo,
       ``,
       `*الأصناف:*`,
       ...lines,
@@ -142,7 +201,7 @@ function CartDrawer({ cartItems, total, onClose, onAdd, onRemove }) {
       `💰 *الإجمالي: ${total} جنيه*`,
     ].join('\n');
 
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+    const url = `https://wa.me/${targetWhatsapp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
     setSent(true);
   }
@@ -170,30 +229,143 @@ function CartDrawer({ cartItems, total, onClose, onAdd, onRemove }) {
         </div>
 
         <div className="drawer-footer">
-          <div className="drawer-total">
+          <div className="drawer-total" style={{ marginBottom: '4px' }}>
             <span>الإجمالي</span>
             <span>{total} جنيه</span>
           </div>
+          {orderType === 'delivery' && (
+            <div style={{ textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              * المجموع لا يشمل خدمة التوصيل
+            </div>
+          )}
 
           {!sent ? (
             <div className="checkout-form">
-              <input
-                type="text"
-                placeholder="اسمك ✍️"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                maxLength={60}
-              />
-              <textarea
-                placeholder="عنوان التوصيل بالتفصيل 📍"
-                value={address}
-                onChange={e => setAddress(e.target.value)}
-                maxLength={200}
-              />
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <button
+                  className={`toggle-address-btn ${orderType === 'delivery' ? 'active' : ''}`}
+                  onClick={() => setOrderType('delivery')}
+                  style={{ flex: 1, margin: 0, padding: '10px 0' }}
+                >
+                  🛵 توصيل
+                </button>
+                <button
+                  className={`toggle-address-btn ${orderType === 'pickup' ? 'active' : ''}`}
+                  onClick={() => setOrderType('pickup')}
+                  style={{ flex: 1, margin: 0, padding: '10px 0' }}
+                >
+                  🚶 استلام من الفرع
+                </button>
+              </div>
+
+              {orderType === 'delivery' && (
+                <button
+                  className={`toggle-address-btn ${isRegistered ? 'active' : ''}`}
+                  onClick={() => setIsRegistered(!isRegistered)}
+                >
+                  {isRegistered ? 'العودة للعنوان الجديد' : 'عنواني مسجل لدي حواوشي الربيع بالفعل'}
+                </button>
+              )}
+
+              {orderType === 'pickup' ? (
+                <>
+                  <input
+                    type="text"
+                    placeholder="اسمك"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    maxLength={60}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="رقم الهاتف"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                  />
+                  <textarea
+                    placeholder="ملاحظات (اختياري)"
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    maxLength={200}
+                  />
+                </>
+              ) : isRegistered ? (
+                <input
+                  type="tel"
+                  placeholder="رقم الهاتف المسجل لدي حواوشي الربيع"
+                  value={registeredPhone}
+                  onChange={e => setRegisteredPhone(e.target.value)}
+                />
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="اسمك"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    maxLength={60}
+                  />
+                  <input
+                    type="text"
+                    placeholder="المنطقه"
+                    value={region}
+                    onChange={e => setRegion(e.target.value)}
+                    maxLength={100}
+                  />
+                  <div className="form-row">
+                    <input
+                      type="tel"
+                      placeholder="رقم الهاتف"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="رقم هاتف اخر (اختياري)"
+                      value={phone2}
+                      onChange={e => setPhone2(e.target.value)}
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="العنوان"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    maxLength={200}
+                  />
+                  <div className="form-row">
+                    <input
+                      type="text"
+                      placeholder="الدور"
+                      value={floor}
+                      onChange={e => setFloor(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="شقه"
+                      value={apartment}
+                      onChange={e => setApartment(e.target.value)}
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="علامه مميزه"
+                    value={landmark}
+                    onChange={e => setLandmark(e.target.value)}
+                  />
+                  <textarea
+                    placeholder="ملاحظات (اختياري)"
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    maxLength={200}
+                  />
+                </>
+              )}
+
               <button
                 className="whatsapp-btn"
                 onClick={handleOrder}
-                disabled={!name.trim() || !address.trim()}
+                disabled={orderType === 'delivery' ? (isRegistered ? !registeredPhone.trim() : (!name.trim() || !phone.trim() || !region.trim() || !address.trim() || !floor.trim() || !apartment.trim() || !landmark.trim())) : (!name.trim() || !phone.trim())}
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
@@ -223,11 +395,71 @@ function CartDrawer({ cartItems, total, onClose, onAdd, onRemove }) {
 
 // ── Main App ──────────────────────────────────────────────────────────
 export default function App() {
-  const [activeTab, setActiveTab] = useState('hawawshi');
+  const [activeTab, setActiveTab] = useState(null);
   const [cart, setCart] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Start with cached data for instant loading
+  const [menuData, setMenuData] = useState({ hawawshiMenu, butcheryMenu });
 
-  const menu = activeTab === 'hawawshi' ? hawawshiMenu : butcheryMenu;
+  useEffect(() => {
+    fetch('https://script.google.com/macros/s/AKfycbxS1_Vp3Xs33FBXxWFaOXNCsOBNrrOU21OtyF44POb8ILMujJ4_04XB-zGxA0rsb7Fv/exec?action=get_menu')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const groupItems = (items) => {
+            const groups = {};
+            (items || []).forEach(item => {
+              if (!groups[item.category]) groups[item.category] = [];
+              groups[item.category].push(item);
+            });
+            return Object.keys(groups).map(cat => ({ category: cat, items: groups[cat] }));
+          };
+          
+          setMenuData({ 
+            hawawshiMenu: groupItems(data.menuImbaba), 
+            butcheryMenu: groupItems(data.menuZayed) 
+          });
+        }
+      })
+      .catch(e => {
+        console.error("Background fetch failed:", e);
+      });
+  }, []);
+
+  // Lock scroll when drawer open
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [drawerOpen]);
+
+  let menuToRender = [];
+  if (searchQuery.trim()) {
+    const query = searchQuery.trim().toLowerCase();
+    const allMenus = [
+      { id: 'hawawshi', data: menuData.hawawshiMenu },
+      { id: 'butchery', data: menuData.butcheryMenu }
+    ];
+    
+    allMenus.forEach(menuSrc => {
+      menuSrc.data.forEach(section => {
+        const filteredItems = section.items.filter(item => 
+          item.name.toLowerCase().includes(query) || 
+          (item.desc && item.desc.toLowerCase().includes(query))
+        );
+        
+        if (filteredItems.length > 0) {
+          menuToRender.push({
+            category: section.category + (menuSrc.id === 'butchery' ? ' (فرع زايد)' : ' (فرع إمبابة)'),
+            items: filteredItems
+          });
+        }
+      });
+    });
+  } else {
+    menuToRender = activeTab === 'hawawshi' ? menuData.hawawshiMenu : menuData.butcheryMenu;
+  }
 
   function cartKey(category, item) {
     return `${category}__${item.name}`;
@@ -266,74 +498,112 @@ export default function App() {
   const totalItems = cartItems.reduce((s, c) => s + c.qty, 0);
   const totalPrice = cartItems.reduce((s, c) => s + c.item.price * c.qty, 0);
 
-  // Lock scroll when drawer open
-  useEffect(() => {
-    document.body.style.overflow = drawerOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [drawerOpen]);
-
   return (
     <>
       {/* SEO */}
       <title>منيو حواوشي الربيع | اطلب اونلاين</title>
 
-      {/* Hero Carousel */}
-      <Carousel />
+      {/* Hero Carousel - Only on Splash Screen */}
+      {activeTab === null && <Carousel />}
 
-      {/* Tabs */}
-      <div className="tab-bar">
-        <button
-          id="tab-hawawshi"
-          className={`tab-btn${activeTab === 'hawawshi' ? ' active' : ''}`}
-          onClick={() => setActiveTab('hawawshi')}
-        >
-          🍔 منيو حواوشي الربيع
-        </button>
-        <button
-          id="tab-butchery"
-          className={`tab-btn${activeTab === 'butchery' ? ' active' : ''}`}
-          onClick={() => setActiveTab('butchery')}
-        >
-          🥩 منيو جزارة الربيع
-        </button>
-      </div>
+      {/* Entry View / Splash Screen */}
+      {activeTab === null ? (
+        <div className="splash-container">
+          <div className="splash-title">اختر الفرع للطلب</div>
+          <button 
+            className="branch-btn imbaba-btn"
+            onClick={() => { setActiveTab('hawawshi'); setCart({}); }}
+          >
+            <span className="branch-btn-icon">🔥🥩</span>
+            <span className="branch-btn-text">منيو فرع إمبابة</span>
+          </button>
+          <button 
+            className="branch-btn zayed-btn"
+            onClick={() => { setActiveTab('butchery'); setCart({}); }}
+          >
+            <span className="branch-btn-icon">🔥🥩</span>
+            <span className="branch-btn-text">منيو فرع زايد</span>
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Search Bar */}
+          <div className="search-container">
+            <input 
+              type="text"
+              className="search-input"
+              placeholder="ابحث عن صنف..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {/* Menu Header (Replaces Tabs) */}
+          {!searchQuery.trim() && (
+            <div className="menu-header-top">
+              <button 
+                className="change-branch-btn"
+                onClick={() => { setActiveTab(null); setCart({}); }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                تغيير الفرع
+              </button>
+              <div className="current-branch-title">
+                {activeTab === 'hawawshi' ? 'منيو فرع إمبابة' : 'منيو فرع زايد'}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Menu Items */}
-      <main className="menu-content">
-        {activeTab === 'butchery' && (
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(212,160,23,0.15), rgba(212,160,23,0.05))',
-            border: '1px solid rgba(212,160,23,0.3)',
-            borderRadius: 'var(--radius)',
-            padding: '12px 16px',
-            marginBottom: '20px',
-            fontSize: '0.85rem',
-            color: 'var(--gold-light, #f0c040)',
-            lineHeight: 1.6
-          }}>
-            🥩 <strong>جزارة الربيع</strong> — لحوم طازجة يومياً. الأسعار بالكيلو إلا إذا ذُكر غير ذلك.
-          </div>
-        )}
-        {menu.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-            لا يوجد أصناف حالياً
-          </div>
-        ) : (
-          menu.map((section, i) => (
-            <CategorySection
-              key={i}
-              category={section.category}
-              items={section.items}
-              cart={cart}
-              onAdd={handleAdd}
-              onRemove={handleRemove}
-            />
-          ))
-        )}
-      </main>
+      {activeTab !== null && (
+        <main className="menu-content">
+          {!searchQuery.trim() && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(212,160,23,0.15), rgba(212,160,23,0.05))',
+              border: '1px solid rgba(212,160,23,0.3)',
+              borderRadius: 'var(--radius)',
+              padding: '16px',
+              marginBottom: '20px',
+              fontSize: '0.85rem',
+              color: 'var(--text)',
+              lineHeight: 1.8
+            }}>
+              {activeTab === 'hawawshi' ? (
+                <div style={{ marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--gold-light)' }}>🔥🥩 <strong>فرع إمبابة:</strong></span> يعمل من 1 ظهراً إلى 2 ليلاً (إجازة يوم الإثنين).
+                </div>
+              ) : (
+                <div>
+                  <span style={{ color: 'var(--gold-light)' }}>🔥🥩 <strong>فرع زايد (أكتوبر الشيخ زايد - مدخل زايد 5):</strong></span> يعمل من 1 ظهراً إلى 2 ليلاً طوال أيام الأسبوع.
+                </div>
+              )}
+            </div>
+          )}
+          {menuToRender.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+              لا يوجد أصناف مطابقة للبحث
+            </div>
+          ) : (
+            menuToRender.map((section, i) => (
+              <CategorySection
+                key={i}
+                category={section.category}
+                items={section.items}
+                cart={cart}
+                onAdd={handleAdd}
+                onRemove={handleRemove}
+              />
+            ))
+          )}
+        </main>
+      )}
 
       {/* Floating Cart Bar */}
-      {totalItems > 0 && (
+      {activeTab !== null && totalItems > 0 && (
         <div className="cart-bar">
           <button
             id="open-cart-btn"
@@ -348,10 +618,11 @@ export default function App() {
       )}
 
       {/* Cart Drawer */}
-      {drawerOpen && (
+      {activeTab !== null && drawerOpen && (
         <CartDrawer
           cartItems={cartItems}
           total={totalPrice}
+          activeTab={activeTab}
           onClose={() => setDrawerOpen(false)}
           onAdd={handleAdd}
           onRemove={handleRemove}

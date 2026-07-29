@@ -31,10 +31,12 @@ export const butcheryMenu = ${JSON.stringify(butcheryMenu, null, 2)};
       fs.writeFileSync('./src/data.js', fileContent, 'utf8');
       console.log("Menu successfully built and injected into src/data.js!");
     } else {
-      console.warn("⚠️ Google Apps Script menu payload empty or unsuccessful. Keeping fallback src/data.js.");
+      console.error("Failed to fetch menu or menu is empty.");
+      process.exit(1);
     }
   } catch (e) {
-    console.warn("⚠️ Error fetching menu during prebuild. Keeping fallback src/data.js:", e.message);
+    console.error("Error during prebuild:", e);
+    process.exit(1);
   }
 }
 
